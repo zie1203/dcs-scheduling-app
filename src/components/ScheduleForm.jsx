@@ -1,15 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import Select from 'react-select';
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { timeToMinutes, minutesToTime, allTimeSlots } from '../utils/timeUtils';
 import {
-  FaCalendarDay,
-  FaChalkboardTeacher,
-  FaClock,
-  FaLayerGroup,
-  FaBook,
-  FaUser,
-  FaDoorOpen,
-} from 'react-icons/fa';
+  CalendarDays,
+  Building,
+  BookOpen,
+  Users,
+  User,
+  Clock,
+  Timer,
+  Hourglass,
+  AlertCircle,
+  CheckCircle,
+} from 'lucide-react';
 
 const ScheduleForm = ({
   rooms,
@@ -24,16 +30,23 @@ const ScheduleForm = ({
   selectedSemester,
   selectedYearLevel,
 }) => {
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('error');
   const [subject, setSubject] = useState('');
   const [section, setSection] = useState('');
   const [facultyMember, setFacultyMember] = useState('');
   const [startTime, setStartTime] = useState('');
-  const [duration, setDuration] = useState(30);
+  const [duration, setDuration] = useState(60);
   const [selectedRoom, setSelectedRoom] = useState('');
   const [selectedDay, setSelectedDay] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState('');
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(''), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
 
   useEffect(() => {
     if (editingSchedule) {
@@ -44,6 +57,16 @@ const ScheduleForm = ({
       setDuration(editingSchedule.duration);
       setSelectedRoom(editingSchedule.room);
       setSelectedDay(editingSchedule.day);
+      setMessage('');
+    } else {
+      setSubject('');
+      setSection('');
+      setFacultyMember('');
+      setStartTime('');
+      setDuration(60);
+      setSelectedRoom('');
+      setSelectedDay('');
+      setMessage('');
     }
   }, [editingSchedule]);
 
@@ -51,17 +74,9 @@ const ScheduleForm = ({
     if (startTime && duration) {
       const startMinutes = timeToMinutes(startTime);
       const endMinutes = startMinutes + parseInt(duration, 10);
-      if (endMinutes > timeToMinutes('09:00 PM')) {
-        setEndTime('Beyond 9:00 PM');
-        setMessage('The selected duration extends beyond 9:00 PM. Please adjust.');
-        setMessageType('error');
-      } else {
-        setEndTime(minutesToTime(endMinutes));
-        setMessage('');
-      }
+      setEndTime(minutesToTime(endMinutes));
     } else {
       setEndTime('');
-      setMessage('');
     }
   }, [startTime, duration]);
 
@@ -72,16 +87,16 @@ const ScheduleForm = ({
 
       for (const existing of schedules) {
         if (editingSchedule && existing.id === editingSchedule.id) continue;
+
         const existingStart = timeToMinutes(existing.startTime);
         const existingEnd = existingStart + existing.duration;
-        const hasOverlap =
-          newStartMinutes < existingEnd && newEndMinutes > existingStart;
+        const hasOverlap = newStartMinutes < existingEnd && newEndMinutes > existingStart;
 
         if (existing.day === newSchedule.day && hasOverlap) {
           if (existing.room === newSchedule.room)
-            return `Room Conflict: ${existing.room} already booked on ${existing.day}.`;
+            return `Room Conflict: ${existing.room} is already occupied.`;
           if (existing.section === newSchedule.section)
-            return `Section Conflict: ${existing.section} already has a class on ${existing.day}.`;
+            return `Section Conflict: ${existing.section} has another class.`;
           if (existing.faculty === newSchedule.faculty)
             return `Faculty Conflict: ${existing.faculty} has another class.`;
         }
@@ -94,19 +109,13 @@ const ScheduleForm = ({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!subject || !section || !facultyMember || !startTime || !duration || !selectedRoom || !selectedDay) {
+      setMessageType('error');
       setMessage('Please fill in all required fields.');
-      setMessageType('error');
-      return;
-    }
-
-    if (endTime === 'Beyond 9:00 PM') {
-      setMessage('Invalid time range.');
-      setMessageType('error');
       return;
     }
 
     const newSchedule = {
-      id: editingSchedule ? editingSchedule.id : Date.now(),
+      id: editingSchedule ? editingSchedule.id : Date.now().toString(),
       subject,
       section,
       faculty: facultyMember,
@@ -122,123 +131,124 @@ const ScheduleForm = ({
 
     const conflict = checkConflict(newSchedule);
     if (conflict) {
-      setMessage(conflict);
       setMessageType('error');
+      setMessage(conflict);
       return;
     }
 
     onAddSchedule(newSchedule);
-    setMessage(editingSchedule ? 'Schedule updated!' : 'Schedule added!');
     setMessageType('success');
-
-    setSubject('');
-    setSection('');
-    setFacultyMember('');
-    setStartTime('');
-    setDuration(30);
-    setSelectedRoom('');
-    setSelectedDay('');
+    setMessage(`Schedule has been ${editingSchedule ? 'updated' : 'added'} successfully.`);
   };
 
-  const durationOptions = Array.from({ length: 12 }, (_, i) => 30 * (i + 1)); 
+  const durationOptions = Array.from({ length: 11 }, (_, i) => 30 * (i + 1));
 
-  const renderSearchableSelect = (label, icon, value, setValue, options, placeholder) => {
-    const formattedOptions = options.map((opt) => ({ value: opt, label: opt }));
-    return (
-      <div className="flex flex-col">
-        <label className="mb-1 text-sm font-medium text-gray-700 flex items-center gap-2">
-          {icon} {label}
-        </label>
-        <Select
-          value={value ? { value, label: value } : null}
-          onChange={(selected) => setValue(selected ? selected.value : '')}
-          options={formattedOptions}
-          placeholder={placeholder}
-          isClearable
-          className="text-sm"
-          styles={{
-            control: (base) => ({
-              ...base,
-              borderColor: '#d1d5db',
-              minHeight: '38px',
-            }),
-          }}
-        />
-      </div>
-    );
-  };
+  const FormLabel = ({ icon, children }) => (
+    <Label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+      {icon}
+      {children}
+    </Label>
+  );
 
   return (
-    <div className="p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">
-        {editingSchedule ? 'Edit Schedule' : 'Add New Schedule'}
-      </h2>
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {renderSearchableSelect('Day', <FaCalendarDay className="text-blue-500" />, selectedDay, setSelectedDay, days, 'Select Day')}
-        {renderSearchableSelect('Room', <FaDoorOpen className="text-blue-500" />, selectedRoom, setSelectedRoom, rooms, 'Select Room')}
-        {renderSearchableSelect('Subject', <FaBook className="text-blue-500" />, subject, setSubject, subjects, 'Select Subject')}
-        {renderSearchableSelect('Section', <FaLayerGroup className="text-blue-500" />, section, setSection, sections, 'Select Section')}
-        {renderSearchableSelect('Faculty', <FaChalkboardTeacher className="text-blue-500" />, facultyMember, setFacultyMember, faculty, 'Select Faculty')}
+    <form onSubmit={handleSubmit} className="space-y-6 py-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <FormLabel icon={<CalendarDays className="w-4 h-4 text-muted-foreground"/>}>Day</FormLabel>
+          <Select value={selectedDay} onValueChange={setSelectedDay}>
+            <SelectTrigger><SelectValue placeholder="Select Day" /></SelectTrigger>
+            <SelectContent>
+              {days.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <FormLabel icon={<Building className="w-4 h-4 text-muted-foreground"/>}>Room</FormLabel>
+          <Select value={selectedRoom} onValueChange={setSelectedRoom}>
+            <SelectTrigger><SelectValue placeholder="Select Room" /></SelectTrigger>
+            <SelectContent>
+              {rooms.map((r) => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <FormLabel icon={<BookOpen className="w-4 h-4 text-muted-foreground"/>}>Subject</FormLabel>
+        <Select value={subject} onValueChange={setSubject}>
+          <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
+          <SelectContent>
+            {subjects.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+          </SelectContent>
+        </Select>
+      </div>
 
-        <div className="flex flex-col">
-          <label className="mb-1 text-sm font-medium text-gray-700 flex items-center gap-2">
-            <FaClock className="text-blue-500" /> Start Time
-          </label>
-          <select
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <FormLabel icon={<Users className="w-4 h-4 text-muted-foreground"/>}>Section</FormLabel>
+          <Select value={section} onValueChange={setSection}>
+            <SelectTrigger><SelectValue placeholder="Select Section" /></SelectTrigger>
+            <SelectContent>
+              {sections.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <FormLabel icon={<User className="w-4 h-4 text-muted-foreground"/>}>Faculty</FormLabel>
+          <Select value={facultyMember} onValueChange={setFacultyMember}>
+            <SelectTrigger><SelectValue placeholder="Select Faculty" /></SelectTrigger>
+            <SelectContent>
+              {faculty.map((f) => (<SelectItem key={f} value={f}>{f}</SelectItem>))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <FormLabel icon={<Clock className="w-4 h-4 text-muted-foreground"/>}>Start Time</FormLabel>
+          <Select value={startTime} onValueChange={setStartTime}>
+            <SelectTrigger><SelectValue placeholder="Select Time" /></SelectTrigger>
+            <SelectContent>
+              {allTimeSlots.slice(0, -1).map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <FormLabel icon={<Timer className="w-4 h-4 text-muted-foreground"/>}>Duration</FormLabel>
+          <Select value={String(duration)} onValueChange={(val) => setDuration(Number(val))}>
+            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+            <SelectContent>
+              {durationOptions.map((d) => (<SelectItem key={d} value={String(d)}>{`${d} mins`}</SelectItem>))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <FormLabel icon={<Hourglass className="w-4 h-4 text-muted-foreground"/>}>End Time</FormLabel>
+          <Input type="text" value={endTime} readOnly className="bg-gray-100 focus:ring-0"/>
+        </div>
+      </div>
+
+      <div className="pt-2 space-y-4">
+        {message && (
+          <div
+            className={`flex items-center gap-3 rounded-lg p-3 text-sm ${
+              messageType === 'error'
+                ? 'bg-red-50 text-red-800'
+                : 'bg-green-50 text-green-800'
+            }`}
           >
-            <option value="" disabled>Select Start Time</option>
-            {allTimeSlots.slice(0, -1).map((time) => (
-              <option key={time} value={time}>{time}</option>
-            ))}
-          </select>
+            {messageType === 'error' ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
+            <span>{message}</span>
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button type="submit">
+            {editingSchedule ? "Update Schedule" : "Add Schedule"}
+          </Button>
         </div>
-
-        <div className="flex flex-col">
-          <label className="mb-1 text-sm font-medium text-gray-700 flex items-center gap-2">
-            <FaClock className="text-blue-500" /> Duration (mins)
-          </label>
-          <select
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
-          >
-            {durationOptions.map((mins) => (
-              <option key={mins} value={mins}>{mins}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col">
-          <label className="mb-1 text-sm font-medium text-gray-700 flex items-center gap-2">
-            <FaClock className="text-blue-500" /> End Time
-          </label>
-          <input
-            type="text"
-            value={endTime}
-            readOnly
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-sm text-gray-600"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <button
-            type="submit"
-            className="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition"
-          >
-            {editingSchedule ? 'Update Schedule' : 'Add Schedule'}
-          </button>
-        </div>
-      </form>
-
-      {message && (
-        <p className={`mt-4 text-sm ${messageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-          {message}
-        </p>
-      )}
-    </div>
+      </div>
+    </form>
   );
 };
 

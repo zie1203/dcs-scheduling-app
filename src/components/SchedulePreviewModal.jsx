@@ -93,14 +93,7 @@ const ExportPDFButton = ({ schedules, filterBy }) => {
     }
   };
 
-  return (
-    <button
-      onClick={handleExportPDF}
-      className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
-    >
-      Export as PDF {filterBy ? `(${filterBy})` : ""}
-    </button>
-  );
+  return;
 };
 
 export default ExportPDFButton;
